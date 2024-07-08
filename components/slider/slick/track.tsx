@@ -1,22 +1,36 @@
-import React, { Component } from 'react';
+import React, { Component, ReactElement } from 'react';
 import PropTypes from 'prop-types';
 import classNames from 'classnames';
 import { dom } from '../../util';
+import type { OptionProps, TrackProps } from '../types';
+
+const isNumber = (value: number | undefined): value is number => {
+    return typeof value === 'number';
+};
 
 /**
  * Slider Track
  * 内容轨道
  */
 
-const getSlideClasses = specProps => {
+const getSlideClasses = (specProps: TrackProps) => {
     const prefix = specProps.prefix;
     let slickActive, slickCenter;
     let centerOffset, index;
 
+    if (
+        !isNumber(specProps.slideCount) ||
+        !isNumber(specProps.activeIndex) ||
+        !isNumber(specProps.slidesToShow) ||
+        !isNumber(specProps.currentSlide)
+    )
+        return;
+
+    // @_@ todo: specProps.activeIndex可能为未定义
     if (specProps.rtl) {
         index = specProps.slideCount - 1 - specProps.activeIndex;
     } else {
-        index = specProps.activeIndex;
+        index = specProps.activeIndex || 0;
     }
 
     const slickCloned = index < 0 || index >= specProps.slideCount;
@@ -42,8 +56,10 @@ const getSlideClasses = specProps => {
     });
 };
 
-const getSlideStyle = function (specProps) {
-    const style = {};
+const getSlideStyle = function (specProps: TrackProps) {
+    if (!isNumber(specProps.slideHeight) || !isNumber(specProps.slideWidth)) return;
+
+    const style: React.CSSProperties = {};
 
     if (specProps.variableWidth === undefined || specProps.variableWidth === false) {
         style.width = specProps.slideWidth;
@@ -54,15 +70,14 @@ const getSlideStyle = function (specProps) {
 
         style.opacity = specProps.currentSlide === specProps.activeIndex ? 1 : 0;
         style.visibility = 'visible';
-        style.zIndex = specProps.currentSlide === specProps.activeIndex ? 1 : 0;
-
         style.transition = `opacity ${specProps.speed}ms ${specProps.cssEase}`;
         style.WebkitTransition = `opacity ${specProps.speed}ms ${specProps.cssEase}`;
 
+        // @_@ todo: specProps.activeIndex可能为未定义
         if (specProps.vertical) {
-            style.top = -specProps.activeIndex * specProps.slideHeight;
+            style.top = -(specProps.activeIndex || 0) * specProps.slideHeight;
         } else {
-            style.left = -specProps.activeIndex * specProps.slideWidth;
+            style.left = -(specProps.activeIndex || 0) * specProps.slideWidth;
         }
     }
 
@@ -73,21 +88,22 @@ const getSlideStyle = function (specProps) {
     return style;
 };
 
-const getKey = (child, fallbackKey) => {
+const getKey = (child: ReactElement, fallbackKey: number) => {
     // key could be a zero
     return child.key === null || child.key === undefined ? fallbackKey : child.key;
 };
 
-const renderSlides = specProps => {
+const renderSlides = (specProps: TrackProps) => {
     let key;
-    const slides = [];
-    const preCloneSlides = [];
-    const postCloneSlides = [];
+    const slides: ReactElement[] = [];
+    const preCloneSlides: ReactElement[] = [];
+    const postCloneSlides: ReactElement[] = [];
     const count = React.Children.count(specProps.children);
-    let child;
+    let child: ReactElement;
 
     React.Children.forEach(specProps.children, (elem, index) => {
-        const childOnClickOptions = {
+        if (!elem) return;
+        const childOnClickOptions: OptionProps = {
             message: 'children',
             index,
             slidesToScroll: specProps.slidesToScroll,
@@ -95,8 +111,10 @@ const renderSlides = specProps => {
         };
 
         if (
-            !specProps.lazyLoad |
-            (specProps.lazyLoad && specProps.lazyLoadedList.indexOf(index) >= 0)
+            !specProps.lazyLoad ||
+            (specProps.lazyLoad &&
+                specProps.lazyLoadedList?.indexOf(index) &&
+                specProps.lazyLoadedList?.indexOf(index) >= 0)
         ) {
             child = elem;
         } else {
@@ -104,8 +122,8 @@ const renderSlides = specProps => {
         }
         const childStyle = getSlideStyle({ ...specProps, activeIndex: index });
         const slickClasses = getSlideClasses({
-            activeIndex: index,
             ...specProps,
+            activeIndex: index,
         });
         let cssClasses;
 
@@ -115,10 +133,11 @@ const renderSlides = specProps => {
             cssClasses = slickClasses;
         }
 
-        const onClick = function (e) {
+        const onClick = function (e: React.MouseEvent<HTMLElement>) {
             // only child === elem, it will has .props.onClick;
             child.props && child.props.onClick && elem.props.onClick(e);
             if (specProps.focusOnSelect) {
+                // @_@ todo: 这里有点奇怪：外层slideProps的同名属性是个布尔值，到里面居然会变成函数？
                 specProps.focusOnSelect(childOnClickOptions);
             }
         };
@@ -142,7 +161,11 @@ const renderSlides = specProps => {
         );
 
         // variableWidth doesn't wrap properly.
-        if (specProps.infinite && specProps.animation !== 'fade') {
+        if (
+            specProps.infinite &&
+            specProps.animation !== 'fade' &&
+            isNumber(specProps.slidesToShow)
+        ) {
             const infiniteCount = specProps.variableWidth
                 ? specProps.slidesToShow + 1
                 : specProps.slidesToShow;
@@ -173,7 +196,7 @@ const renderSlides = specProps => {
         }
     });
     // To support server-side rendering
-    if (!dom.hasDOM) {
+    if (!dom.hasDOM && isNumber(specProps.currentSlide) && isNumber(specProps.slidesToShow)) {
         return slides.slice(
             specProps.currentSlide,
             specProps.currentSlide + specProps.slidesToShow
@@ -186,7 +209,7 @@ const renderSlides = specProps => {
     }
 };
 
-export default class Track extends Component {
+export default class Track extends Component<TrackProps> {
     static propTypes = {
         prefix: PropTypes.string,
         trackStyle: PropTypes.object,
