@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import classNames from 'classnames';
 import { func } from '../../util';
+import type { DotsProps, OptionProps } from '../types';
 
 /**
  * slider dots
@@ -10,7 +11,11 @@ import { func } from '../../util';
 
 const { noop } = func;
 
-export default class Dots extends React.Component {
+const isNumber = (value: number | undefined): value is number => {
+    return typeof value === 'number';
+};
+
+export default class Dots extends React.Component<DotsProps> {
     static propTypes = {
         prefix: PropTypes.string,
         currentSlide: PropTypes.number,
@@ -27,10 +32,10 @@ export default class Dots extends React.Component {
         changeSlide: noop,
     };
 
-    handleChangeSlide(options, e) {
+    handleChangeSlide(options: OptionProps, e: React.MouseEvent<HTMLElement>) {
         e.preventDefault();
 
-        this.props.changeSlide(options);
+        this.props.changeSlide?.(options);
     }
 
     render() {
@@ -45,6 +50,8 @@ export default class Dots extends React.Component {
             triggerType,
             rtl,
         } = this.props;
+
+        if (!isNumber(currentSlide) || !isNumber(slideCount) || !isNumber(slidesToScroll)) return;
 
         const dotsClazz = classNames(`${prefix}slick-dots`, dotsDirection, dotsClass);
         const dotCount = Math.ceil(slideCount / slidesToScroll);
@@ -64,10 +71,8 @@ export default class Dots extends React.Component {
             };
             // 除非设置为hover，默认使用click触发
             const handleProp = {
-                [triggerType.toLowerCase() === 'hover' ? 'onMouseEnter' : 'onClick']: this.handleChangeSlide.bind(
-                    this,
-                    dotOptions
-                ),
+                [triggerType?.toLowerCase() === 'hover' ? 'onMouseEnter' : 'onClick']:
+                    this.handleChangeSlide.bind(this, dotOptions),
             };
 
             let docIndex = i;
@@ -83,7 +88,7 @@ export default class Dots extends React.Component {
                         <span>{dotsRender(docIndex, currentSlideIndex)}</span>
                     ) : (
                         // Slider is navigated by right and left arrow buttons so the dots are not required functionality
-                        <button tabIndex="-1" />
+                        <button tabIndex={-1} />
                     )}
                 </li>
             );

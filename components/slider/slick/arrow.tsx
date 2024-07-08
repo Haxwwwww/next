@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import classNames from 'classnames';
 import Icon from '../../icon';
 import { obj, func } from '../../util';
+import type { OptionProps, ArrowProps } from '../types';
 
 /**
  * slider arrow
@@ -11,7 +12,11 @@ import { obj, func } from '../../util';
 
 const { noop } = func;
 
-export default class Arrow extends Component {
+const isNumber = (value: number | undefined): value is number => {
+    return typeof value === 'number';
+};
+
+export default class Arrow extends Component<ArrowProps> {
     static propTypes = {
         prefix: PropTypes.string,
         rtl: PropTypes.bool,
@@ -36,8 +41,16 @@ export default class Arrow extends Component {
         onMouseLeave: noop,
     };
 
-    static isDisabled(props) {
+    static ARROW_ICON_TYPES = {
+        hoz: { prev: 'arrow-left', next: 'arrow-right' },
+        ver: { prev: 'arrow-up', next: 'arrow-down' },
+    };
+
+    static isDisabled(props: ArrowProps) {
         const { infinite, type, centerMode, currentSlide, slideCount, slidesToShow } = props;
+
+        if (!isNumber(currentSlide) || !isNumber(slideCount) || !isNumber(slidesToShow))
+            return false;
 
         if (infinite) {
             return false;
@@ -64,12 +77,7 @@ export default class Arrow extends Component {
         return false;
     }
 
-    static ARROW_ICON_TYPES = {
-        hoz: { prev: 'arrow-left', next: 'arrow-right' },
-        ver: { prev: 'arrow-up', next: 'arrow-down' },
-    };
-
-    handleClick(options, e) {
+    handleClick(options: OptionProps, e: React.MouseEvent<HTMLElement>) {
         e && e.preventDefault();
 
         // TODO hack
@@ -77,7 +85,7 @@ export default class Arrow extends Component {
             options.message = 'previous';
         }
 
-        this.props.clickHandler(options, e);
+        this.props.clickHandler?.(options, e);
     }
 
     render() {
@@ -97,7 +105,13 @@ export default class Arrow extends Component {
         const disabled = Arrow.isDisabled(this.props);
 
         const arrowClazz = classNames(
-            [`${prefix}slick-arrow`, `${prefix}slick-${type}`, arrowPosition, arrowSize, arrowDirection],
+            [
+                `${prefix}slick-arrow`,
+                `${prefix}slick-${type}`,
+                arrowPosition,
+                arrowSize,
+                arrowDirection,
+            ],
             { disabled }
         );
 
@@ -108,8 +122,8 @@ export default class Arrow extends Component {
             className: arrowClazz,
             style: { display: 'block' },
             onClick: disabled ? null : this.handleClick.bind(this, { message: type }),
-            onMouseEnter: disabled ? null : onMouseEnter,
-            onMouseLeave: disabled ? null : onMouseLeave,
+            onMouseEnter: disabled ? undefined : onMouseEnter,
+            onMouseLeave: disabled ? undefined : onMouseLeave,
         };
 
         if (children) {

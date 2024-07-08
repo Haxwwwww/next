@@ -7,6 +7,7 @@ import HelpersMixin from './mixins/helpers';
 import Arrow from './arrow';
 import Track from './track';
 import Dots from './dots';
+import type { InnerSliderProps, InnerSliderState, OptionProps } from '../types';
 
 /**
  * Slider inner
@@ -14,7 +15,7 @@ import Dots from './dots';
 
 const { noop } = func;
 
-class InnerSlider extends React.Component {
+class InnerSlider extends React.Component<InnerSliderProps, InnerSliderState> {
     static propTypes = {
         prefix: PropTypes.string,
         animation: PropTypes.oneOfType([PropTypes.string, PropTypes.bool]),
@@ -53,24 +54,33 @@ class InnerSlider extends React.Component {
         triggerType: 'click',
     };
 
-    constructor(props) {
+    // @_@ todo: 这些变量是否应当指定为private？
+    private hasMounted: boolean = false;
+    private animationEndCallback: NodeJS.Timeout | undefined;
+    // @_@ todo: _instanceRefHandler能绑定的变量
+    private pArrow?: HTMLDivElement;
+    private nArrow?: HTMLDivElement;
+    private list?: HTMLDivElement;
+    private track?: HTMLDivElement;
+
+    constructor(props: InnerSliderProps) {
         super(props);
 
         this.state = {
             animating: false,
             dragging: false,
-            autoPlayTimer: null,
+            autoPlayTimer: undefined,
             currentDirection: 0,
-            currentLeft: null,
+            currentLeft: 0,
             currentSlide: 'activeIndex' in props ? props.activeIndex : props.defaultActiveIndex,
             direction: 1,
-            listWidth: null,
-            listHeight: null,
-            slideCount: null,
-            slideWidth: null,
-            slideHeight: null,
+            listWidth: undefined,
+            listHeight: undefined,
+            slideCount: undefined,
+            slideWidth: undefined,
+            slideHeight: undefined,
             slideHeightList: [],
-            swipeLeft: null,
+            swipeLeft: undefined,
             touchObject: {
                 startX: 0,
                 startY: 0,
@@ -102,8 +112,8 @@ class InnerSlider extends React.Component {
         ]);
     }
 
-    static getDerivedStateFromProps(nextProps, prevState) {
-        const state = {};
+    static getDerivedStateFromProps(nextProps: InnerSliderProps, prevState: InnerSliderState) {
+        const state: InnerSliderState = {};
 
         const { lazyLoad, children, slidesToShow, activeIndex } = nextProps;
         const { currentSlide } = prevState;
@@ -116,7 +126,7 @@ class InnerSlider extends React.Component {
 
         if (lazyLoad) {
             for (let i = 0, j = React.Children.count(children); i < j; i++) {
-                if (i >= currentSlide && i < currentSlide + slidesToShow) {
+                if (currentSlide && i >= currentSlide && i < currentSlide + (slidesToShow || 0)) {
                     lazyLoadedList.push(i);
 
                     const pre = i - 1 < 0 ? j - 1 : i - 1;
@@ -127,7 +137,7 @@ class InnerSlider extends React.Component {
                 }
             }
 
-            if (prevState.lazyLoadedList.length === 0) {
+            if (prevState.lazyLoadedList?.length === 0) {
                 state.lazyLoadedList = lazyLoadedList;
             }
         }
@@ -153,25 +163,33 @@ class InnerSlider extends React.Component {
         }
     }
 
-    componentDidUpdate(prevProps, prevState) {
-        if (prevProps.activeIndex !== this.props.activeIndex) {
+    componentDidUpdate(prevProps: InnerSliderProps, prevState: InnerSliderState) {
+        if (this.props.activeIndex && prevProps.activeIndex !== this.props.activeIndex) {
             this.slickGoTo(this.props.activeIndex);
-        } else if (prevState.currentSlide >= this.props.children.length) {
+        } else if (
+            prevState.currentSlide &&
+            prevState.currentSlide >= (this.props.children?.length || 0)
+        ) {
             this.update(this.props);
             this.changeSlide({
                 message: 'index',
-                index: this.props.children.length - this.props.slidesToShow,
+                index: (this.props.children?.length || 0) - (this.props.slidesToShow || 0),
                 currentSlide: this.state.currentSlide,
             });
         } else {
-            const diffKeys = [];
-            Object.keys(prevProps).forEach(key => {
+            const diffKeys: string[] = [];
+            Object.keys(prevProps).forEach((key: keyof typeof prevProps) => {
                 if (key in this.props && prevProps[key] !== this.props[key]) {
                     diffKeys.push(key);
                 }
             });
             // children 每次都会不同，所以不需要检测
-            if (diffKeys.every(key => key === 'children' || typeof this.props[key] === 'function')) {
+            if (
+                diffKeys.every(
+                    (key: keyof typeof prevProps) =>
+                        key === 'children' || typeof this.props[key] === 'function'
+                )
+            ) {
                 // do nothing;
             } else {
                 const update = !obj.shallowEqual(prevProps, this.props);
@@ -196,6 +214,18 @@ class InnerSlider extends React.Component {
         }
     }
 
+    initialize = (props: InnerSliderProps) => HelpersMixin.initialize(props);
+    adaptHeight = () => HelpersMixin.adaptHeight();
+    update = (props: InnerSliderProps) => HelpersMixin.update(props);
+    changeSlide = (option: OptionProps) => EventHandlersMixin.changeSlide(option);
+    arrowHoverHandler = (msg?: string) => HelpersMixin.arrowHoverHandler(msg);
+    onInnerSliderEnter = EventHandlersMixin.onInnerSliderEnter;
+    onInnerSliderLeave = EventHandlersMixin.onInnerSliderLeave;
+    swipeStart = EventHandlersMixin.swipeStart;
+    swipeEnd = EventHandlersMixin.swipeEnd;
+    swipeMove = EventHandlersMixin.swipeMove;
+    selectHandler = EventHandlersMixin.selectHandler;
+
     onWindowResized() {
         this.update(this.props);
         // animating state should be cleared while resizing, otherwise autoplay stops working
@@ -204,7 +234,7 @@ class InnerSlider extends React.Component {
         delete this.animationEndCallback;
     }
 
-    slickGoTo(slide) {
+    slickGoTo(slide: number) {
         typeof slide === 'number' &&
             this.changeSlide({
                 message: 'index',
@@ -213,7 +243,7 @@ class InnerSlider extends React.Component {
             });
     }
 
-    onEnterArrow(msg) {
+    onEnterArrow(msg: string) {
         this.arrowHoverHandler(msg);
     }
 
@@ -221,7 +251,7 @@ class InnerSlider extends React.Component {
         this.arrowHoverHandler();
     }
 
-    _instanceRefHandler(attr, ref) {
+    _instanceRefHandler(attr: 'pArrow' | 'nArrow' | 'list' | 'track', ref: HTMLDivElement) {
         this[attr] = ref;
     }
 
@@ -265,35 +295,50 @@ class InnerSlider extends React.Component {
             dragging,
         } = this.state;
 
-        // TODO 需要精简一下
-        const trackProps = {
-            prefix,
-            animation,
-            cssEase,
-            speed,
-            infinite,
-            centerMode,
-            focusOnSelect: focusOnSelect ? this.selectHandler : null,
-            currentSlide,
-            lazyLoad,
-            lazyLoadedList,
-            rtl,
-            slideWidth,
-            slideHeight,
-            slidesToShow,
-            slidesToScroll,
-            slideCount,
-            trackStyle,
-            variableWidth,
-            vertical,
-            verticalSwiping,
-            triggerType,
-            // clickHandler: this.changeSlide, unused
-        };
+        let trackEle;
+        if (
+            slideCount &&
+            slidesToScroll &&
+            currentSlide &&
+            slidesToShow &&
+            slideWidth &&
+            slideHeight
+        ) {
+            // TODO 需要精简一下
+            const trackProps = {
+                prefix,
+                animation,
+                cssEase,
+                speed,
+                infinite,
+                centerMode,
+                focusOnSelect: focusOnSelect ? this.selectHandler : undefined,
+                currentSlide,
+                lazyLoad,
+                lazyLoadedList,
+                rtl,
+                slideWidth,
+                slideHeight,
+                slidesToShow,
+                slidesToScroll,
+                slideCount,
+                trackStyle,
+                variableWidth,
+                vertical,
+                verticalSwiping,
+                triggerType,
+                // clickHandler: this.changeSlide, unused
+            };
+            trackEle = (
+                <Track ref={this._instanceRefHandler.bind(this, 'track')} {...trackProps}>
+                    {children}
+                </Track>
+            );
+        }
 
         let dotsEle;
 
-        if (dots === true && slideCount > slidesToShow) {
+        if (dots === true && currentSlide && slideCount && slideCount > (slidesToShow || 0)) {
             const dotProps = {
                 prefix,
                 rtl,
@@ -313,46 +358,49 @@ class InnerSlider extends React.Component {
 
         let prevArrow, nextArrow;
 
-        const arrowProps = {
-            prefix,
-            rtl,
-            arrowSize,
-            arrowPosition,
-            arrowDirection,
-            infinite,
-            centerMode,
-            currentSlide,
-            slideCount,
-            slidesToShow,
-            clickHandler: this.changeSlide,
-        };
+        if (slideCount && currentSlide) {
+            const arrowProps = {
+                prefix,
+                rtl,
+                arrowSize,
+                arrowPosition,
+                arrowDirection,
+                infinite,
+                centerMode,
+                currentSlide,
+                slideCount,
+                slidesToShow,
+                slidesToScroll,
+                clickHandler: this.changeSlide,
+            };
 
-        if (arrows) {
-            prevArrow = (
-                <Arrow
-                    {...arrowProps}
-                    type="prev"
-                    aria-label="Previous"
-                    ref={this._instanceRefHandler.bind(this, 'pArrow')}
-                    onMouseEnter={animation ? this.onEnterArrow.bind(this, 'prev') : noop}
-                    onMouseLeave={animation ? this.onLeaveArrow.bind(this, 'prev') : noop}
-                >
-                    {this.props.prevArrow}
-                </Arrow>
-            );
+            if (arrows) {
+                prevArrow = (
+                    <Arrow
+                        {...arrowProps}
+                        type="prev"
+                        aria-label="Previous"
+                        ref={this._instanceRefHandler.bind(this, 'pArrow')}
+                        onMouseEnter={animation ? this.onEnterArrow.bind(this, 'prev') : noop}
+                        onMouseLeave={animation ? this.onLeaveArrow.bind(this, 'prev') : noop}
+                    >
+                        {this.props.prevArrow}
+                    </Arrow>
+                );
 
-            nextArrow = (
-                <Arrow
-                    {...arrowProps}
-                    type="next"
-                    aria-label="Next"
-                    ref={this._instanceRefHandler.bind(this, 'nArrow')}
-                    onMouseEnter={animation ? this.onEnterArrow.bind(this, 'next') : noop}
-                    onMouseLeave={animation ? this.onLeaveArrow.bind(this, 'next') : noop}
-                >
-                    {this.props.nextArrow}
-                </Arrow>
-            );
+                nextArrow = (
+                    <Arrow
+                        {...arrowProps}
+                        type="next"
+                        aria-label="Next"
+                        ref={this._instanceRefHandler.bind(this, 'nArrow')}
+                        onMouseEnter={animation ? this.onEnterArrow.bind(this, 'next') : noop}
+                        onMouseLeave={animation ? this.onLeaveArrow.bind(this, 'next') : noop}
+                    >
+                        {this.props.nextArrow}
+                    </Arrow>
+                );
+            }
         }
 
         const verticalHeightStyle = vertical
@@ -363,7 +411,9 @@ class InnerSlider extends React.Component {
 
         let centerPaddingStyle;
         if (centerMode) {
-            centerPaddingStyle = vertical ? { padding: `${centerPadding} 0px` } : { padding: `0px ${centerPadding}` };
+            centerPaddingStyle = vertical
+                ? { padding: `${centerPadding} 0px` }
+                : { padding: `0px ${centerPadding}` };
         }
 
         return (
@@ -378,16 +428,17 @@ class InnerSlider extends React.Component {
                     style={{ ...verticalHeightStyle, ...centerPaddingStyle }}
                     onMouseDown={this.swipeStart}
                     onMouseUp={this.swipeEnd}
-                    onTouchStart={this.swipeStart}
+                    onTouchStart={e => this.swipeStart}
                     onTouchEnd={this.swipeEnd}
-                    onMouseMove={dragging ? this.swipeMove : null}
-                    onMouseLeave={dragging ? this.swipeEnd : null}
-                    onTouchMove={dragging ? this.swipeMove : null}
-                    onTouchCancel={dragging ? this.swipeEnd : null}
+                    onMouseMove={dragging ? this.swipeMove : undefined}
+                    onMouseLeave={dragging ? this.swipeEnd : undefined}
+                    onTouchMove={dragging ? this.swipeMove : undefined}
+                    onTouchCancel={dragging ? this.swipeEnd : undefined}
                 >
-                    <Track ref={this._instanceRefHandler.bind(this, 'track')} {...trackProps}>
+                    {/* <Track ref={this._instanceRefHandler.bind(this, 'track')} {...trackProps}>
                         {children}
-                    </Track>
+                    </Track> */}
+                    {trackEle}
                 </div>
                 {prevArrow}
                 {nextArrow}
@@ -398,7 +449,8 @@ class InnerSlider extends React.Component {
 }
 
 // extend prototype
-Object.assign(InnerSlider.prototype, HelpersMixin);
-Object.assign(InnerSlider.prototype, EventHandlersMixin);
+// @_@ todo: ES6貌似不支持在运行时动态添加方法到原型上
+// Object.assign(InnerSlider.prototype, HelpersMixin);
+// Object.assign(InnerSlider.prototype, EventHandlersMixin);
 
 export default polyfill(InnerSlider);
