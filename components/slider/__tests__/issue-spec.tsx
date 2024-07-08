@@ -138,12 +138,12 @@ describe('Issue', () => {
         const root = document.createElement('div');
         document.body.appendChild(root);
         wrapper = mount(
-            <Slider {...settings} >
+            <Slider {...settings}>
                 {[1, 2, 3, 4, 5, 6].map(function (d) {
                     return (
                         <div key={d}>
                             <h3
-                                onClick={(e) => {
+                                onClick={e => {
                                     assert(d === i);
                                 }}
                             >
@@ -159,13 +159,12 @@ describe('Issue', () => {
         await delay(800);
         i = 2;
         const element = root.querySelector('.next-slick-list');
-        element.scrollIntoView()
+        element.scrollIntoView();
         const boundingRect = element.getBoundingClientRect();
         const clientX = boundingRect.left + boundingRect.width / 2;
         const clientY = boundingRect.top + boundingRect.height / 2;
 
         const clickedElement = document.elementFromPoint(clientX, clientY);
         clickedElement.click();
-
     });
 });
